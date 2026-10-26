@@ -1,0 +1,268 @@
+<!doctype html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>AI Privacy Audit — démo</title>
+<meta name="description" content="Démo animée du skill Claude ai-privacy-audit : détection des fuites de données personnelles vers les IA dans une codebase.">
+<style>
+  :root {
+    --bg: #0b0d12; --panel: #12151c; --panel-2: #181c25; --line: #232836;
+    --text: #e6e8ee; --muted: #8b93a7; --accent: #7c9cff;
+    --crit: #ff5d6c; --high: #ff9f43; --med: #f7d154; --low: #5ad1a0;
+    --hl: rgba(255, 93, 108, .14); --scan: rgba(124, 156, 255, .14);
+    --mono: ui-monospace, "JetBrains Mono", "Cascadia Code", Consolas, monospace;
+  }
+  * { box-sizing: border-box; }
+  body { margin: 0; background: var(--bg); color: var(--text); font: 15px/1.55 system-ui, -apple-system, "Segoe UI", sans-serif; }
+  a { color: var(--accent); }
+  .wrap { max-width: 1180px; margin: 0 auto; padding: 32px 16px 64px; }
+  header h1 { font-size: clamp(28px, 4.5vw, 46px); line-height: 1.1; margin: 0 0 12px; letter-spacing: -.02em; }
+  header p { color: var(--muted); max-width: 720px; margin: 0 0 20px; }
+  .pill { display: inline-block; font: 12px var(--mono); color: var(--accent); border: 1px solid var(--line); border-radius: 999px; padding: 3px 10px; margin-bottom: 16px; }
+  .controls { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; margin: 24px 0 12px; }
+  button { font: 600 14px system-ui; color: var(--text); background: var(--panel-2); border: 1px solid var(--line); border-radius: 8px; padding: 8px 14px; cursor: pointer; }
+  button:hover { border-color: var(--accent); }
+  button:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+  .step-label { font: 13px var(--mono); color: var(--muted); margin-left: 6px; }
+  .bar { height: 4px; background: var(--line); border-radius: 4px; overflow: hidden; margin-bottom: 20px; }
+  .bar > div { height: 100%; background: var(--accent); }
+  .grid { display: grid; grid-template-columns: minmax(0, 1.15fr) minmax(0, 1fr); gap: 16px; }
+  @media (max-width: 860px) { .grid { grid-template-columns: 1fr; } }
+  .panel { background: var(--panel); border: 1px solid var(--line); border-radius: 12px; overflow: hidden; min-width: 0; }
+  .tabs { display: flex; border-bottom: 1px solid var(--line); overflow-x: auto; }
+  .tab { font: 13px var(--mono); padding: 10px 14px; color: var(--muted); border-right: 1px solid var(--line); white-space: nowrap; position: relative; }
+  .tab.on { color: var(--text); background: var(--panel-2); }
+  .tab .ok { color: var(--low); margin-left: 6px; }
+  .code { font: 13px/1.7 var(--mono); padding: 10px 0; overflow-x: auto; min-height: 430px; }
+  .ln { display: flex; position: relative; white-space: pre; padding-right: 16px; }
+  .ln .n { width: 44px; flex: none; text-align: right; padding-right: 14px; color: #4b5266; user-select: none; }
+  .ln .hl { position: absolute; inset: 0; z-index: 0; }
+  .ln span { position: relative; z-index: 1; }
+  .side { padding: 16px; display: flex; flex-direction: column; gap: 10px; min-height: 480px; }
+  .side h2 { font-size: 14px; text-transform: uppercase; letter-spacing: .08em; color: var(--muted); margin: 0 0 4px; }
+  .card { background: var(--panel-2); border: 1px solid var(--line); border-left: 3px solid var(--sev); border-radius: 8px; padding: 10px 12px; }
+  .card .t { font-weight: 650; }
+  .card .w { font: 12px var(--mono); color: var(--muted); margin: 2px 0 6px; }
+  .card .d { color: #c3c8d4; font-size: 14px; }
+  .card .f { font-size: 13px; margin-top: 6px; color: var(--low); }
+  .sev { font: 700 11px var(--mono); color: var(--sev); letter-spacing: .06em; margin-right: 8px; }
+  .scanline { font: 13px var(--mono); color: var(--muted); }
+  .scanline b { color: var(--accent); font-weight: 600; }
+  .stats { display: grid; grid-template-columns: repeat(4, 1fr); gap: 10px; }
+  .stat { background: var(--panel-2); border: 1px solid var(--line); border-radius: 10px; padding: 14px; text-align: center; }
+  .stat .v { font: 700 34px var(--mono); color: var(--sev); }
+  .stat .k { font-size: 12px; color: var(--muted); text-transform: uppercase; letter-spacing: .08em; }
+  section.how { margin-top: 48px; display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 12px; }
+  section.how div { background: var(--panel); border: 1px solid var(--line); border-radius: 12px; padding: 16px; }
+  section.how h3 { margin: 0 0 6px; font-size: 15px; }
+  section.how p { margin: 0; color: var(--muted); font-size: 14px; }
+  pre.install { background: var(--panel); border: 1px solid var(--line); border-radius: 10px; padding: 14px 16px; font: 13px var(--mono); overflow-x: auto; }
+  footer { margin-top: 40px; color: var(--muted); font-size: 13px; }
+  @media (prefers-reduced-motion: reduce) { * { transition: none !important; animation: none !important; } }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <span class="pill">Claude Code skill · ai-privacy-audit</span>
+    <h1>Vos données clients partent-elles vers une IA&nbsp;?</h1>
+    <p>Un skill Claude qui audite une codebase : données personnelles envoyées aux API LLM, prompt injection, RAG sans contrôle d'accès, prompts dans les logs, clés exposées. Ci-dessous, le replay de l'audit réel sur une app de test contenant 8 failles volontaires.</p>
+  </header>
+  <div id="root"></div>
+
+  <section class="how">
+    <div><h3>1 · Cartographier</h3><p>Repère chaque appel à un LLM, embedding ou vector store (OpenAI, Anthropic, Mistral, Gemini, Pinecone, Qdrant…).</p></div>
+    <div><h3>2 · Tracer le flux</h3><p>Remonte d'où viennent les données du prompt. Constante = rien. <code>user.email</code> = constat.</p></div>
+    <div><h3>3 · Calibrer</h3><p>Gravité selon l'impact réel : un agent avec SQL + entrée libre est critique, un chatbot sans outils ne l'est pas.</p></div>
+    <div><h3>4 · Rapporter</h3><p>Constats <code>fichier:ligne</code> vérifiés, scénario, correctif. Aucun secret recopié, aucun code modifié.</p></div>
+  </section>
+
+  <h2 style="margin-top:48px">Installer</h2>
+  <pre class="install">git clone https://github.com/OutOfAmine/ai-privacy-audit
+cp -r ai-privacy-audit/skills/ai-privacy-audit ~/.claude/skills/
+# puis dans Claude Code : « audite mon projet pour les fuites de données vers l'IA »</pre>
+  <footer>Code de démo et rapport complet : <a href="https://github.com/OutOfAmine/ai-privacy-audit/tree/main/examples">examples/</a> · MIT</footer>
+</div>
+
+<script type="module">
+import React, { useState, useEffect } from "https://esm.sh/react@18.3.1";
+import { createRoot } from "https://esm.sh/react-dom@18.3.1/client";
+import { motion, AnimatePresence } from "https://esm.sh/framer-motion@11.11.17?deps=react@18.3.1,react-dom@18.3.1";
+import htm from "https://esm.sh/htm@3.1.1";
+const html = htm.bind(React.createElement);
+
+const FILES = {
+  "src/support.py": `import logging
+from anthropic import Anthropic
+from db import get_customer, run_sql
+import pinecone
+
+client = Anthropic(api_key="sk-ant-EXAMPLE-NOT-A-REAL-KEY")
+log = logging.getLogger(__name__)
+index = pinecone.Index("tickets")
+
+def answer_ticket(customer_id, message):
+    customer = get_customer(customer_id)  # name, email, iban, medical_notes
+    prompt = f"You are support. Customer data: {customer}. Question: {message}"
+    log.info("prompt=%s", prompt)
+    resp = client.messages.create(model="claude-sonnet-5-5", max_tokens=500,
+        messages=[{"role": "user", "content": prompt}],
+        tools=[{"name": "run_sql", "description": "run any SQL", ...}])
+    for block in resp.content:
+        if block.type == "tool_use":
+            run_sql(block.input["query"])
+    return resp
+
+def search_docs(query_embedding, tenant_id):
+    # tenant_id ignored
+    return index.query(vector=query_embedding, top_k=5)`,
+  "web/chat.js": `const KEY = import.meta.env.VITE_OPENAI_KEY;
+export async function ask(q) {
+  const r = await fetch("https://api.openai.com/v1/chat/completions", {
+    method: "POST", headers: { Authorization: \`Bearer \${KEY}\` },
+    body: JSON.stringify({ model: "gpt-4o", messages: [{ role: "user", content: q }] })
+  });
+  const j = await r.json();
+  document.getElementById("out").innerHTML = j.choices[0].message.content;
+}`,
+  "src/safe.py": `def summarize(): return 'static'`,
+};
+
+const SEV = { CRITIQUE: "var(--crit)", HAUTE: "var(--high)", MOYENNE: "var(--med)", BASSE: "var(--low)" };
+
+const FINDINGS = [
+  { sev: "CRITIQUE", file: "src/support.py", lines: [12, 16, 18, 19], t: "Agent SQL arbitraire piloté par l'utilisateur",
+    d: "Le message libre du client entre dans le prompt ; l'outil run_sql exécute tout SQL renvoyé par le modèle. Une prompt injection = accès total à la base.",
+    f: "Outils métier étroits, customer_id depuis la session, compte DB lecture seule." },
+  { sev: "CRITIQUE", file: "web/chat.js", lines: [1, 4], t: "Clé OpenAI exposée dans le navigateur",
+    d: "VITE_OPENAI_KEY est inlinée dans le bundle : extractible depuis les DevTools.",
+    f: "Révoquer, passer par un endpoint backend authentifié." },
+  { sev: "CRITIQUE", file: "src/support.py", lines: [22, 23, 24], t: "RAG multi-tenant sans filtre",
+    d: "tenant_id reçu puis ignoré : un client récupère les tickets des autres.",
+    f: "namespace=tenant_id ou filter côté serveur." },
+  { sev: "CRITIQUE", file: "web/chat.js", lines: [8], t: "Sortie LLM rendue en innerHTML (XSS)",
+    d: "Via injection, le modèle renvoie du HTML/JS exécuté dans la page.",
+    f: "textContent, ou Markdown passé dans DOMPurify." },
+  { sev: "HAUTE", file: "src/support.py", lines: [11, 12], t: "Santé + IBAN envoyés sans minimisation",
+    d: "L'objet client entier (notes médicales, art. 9 RGPD) est sérialisé dans le prompt.",
+    f: "Sélection explicite des champs utiles, masquage PII." },
+  { sev: "HAUTE", file: "src/support.py", lines: [13], t: "Prompt complet loggé en clair",
+    d: "Fiche client et message écrits dans les logs applicatifs.",
+    f: "Logger seulement des métadonnées, purger l'existant." },
+  { sev: "HAUTE", file: "src/support.py", lines: [6], t: "Clé Anthropic en dur",
+    d: "Clé codée dans le source (valeur non reproduite dans le rapport).",
+    f: "Révoquer, lire ANTHROPIC_API_KEY depuis l'environnement, gitleaks en CI." },
+  { sev: "BASSE", file: "src/support.py", lines: [8], t: "Pas d'effacement des embeddings",
+    d: "Aucun chemin pour supprimer les vecteurs d'un client (droit à l'effacement).",
+    f: "Metadata customer_id + index.delete(filter=…)." },
+];
+
+const SCAN = [
+  { file: "src/support.py", lines: [2, 4, 14, 24], msg: html`<b>grep</b> anthropic · pinecone · messages.create · index.query` },
+  { file: "web/chat.js", lines: [3], msg: html`<b>grep</b> api.openai.com/v1/chat/completions` },
+  { file: "src/safe.py", lines: [], msg: html`<b>trace</b> safe.py — aucun appel IA, ignoré` },
+];
+
+// step 0..2 scan, 3..10 findings, 11 summary
+const LAST = SCAN.length + FINDINGS.length;
+
+function Code({ file, lines, scan }) {
+  return html`<div class="code">${FILES[file].split("\n").map((l, i) => {
+    const on = lines.includes(i + 1);
+    return html`<div class="ln" key=${file + i}>
+      <${AnimatePresence}>${on && html`<${motion.div} class="hl" key="hl"
+        style=${{ background: scan ? "var(--scan)" : "var(--hl)", boxShadow: `inset 3px 0 0 ${scan ? "var(--accent)" : "var(--crit)"}` }}
+        initial=${{ scaleX: 0, opacity: 0 }} animate=${{ scaleX: 1, opacity: 1 }} exit=${{ opacity: 0 }}
+        transition=${{ duration: .45, ease: "easeOut" }} />`}<//>
+      <span class="n">${i + 1}</span><span>${l || " "}</span>
+    </div>`;
+  })}</div>`;
+}
+
+function Counter({ to }) {
+  const [v, setV] = useState(0);
+  useEffect(() => { let n = 0; const id = setInterval(() => { n++; setV(n); if (n >= to) clearInterval(id); }, 160); return () => clearInterval(id); }, [to]);
+  return html`${v}`;
+}
+
+function App() {
+  const [step, setStep] = useState(0);
+  const [playing, setPlaying] = useState(true);
+  useEffect(() => {
+    if (!playing || step >= LAST) return;
+    const id = setTimeout(() => setStep(s => s + 1), step < SCAN.length ? 1700 : 2600);
+    return () => clearTimeout(id);
+  }, [step, playing]);
+
+  const scanning = step < SCAN.length;
+  const cur = scanning ? SCAN[step] : step < LAST ? FINDINGS[step - SCAN.length] : null;
+  const file = cur ? cur.file : "src/support.py";
+  const shown = FINDINGS.slice(0, Math.max(0, Math.min(step - SCAN.length + 1, FINDINGS.length)));
+  const done = step >= LAST;
+  const counts = ["CRITIQUE", "HAUTE", "MOYENNE", "BASSE"].map(s => [s, FINDINGS.filter(f => f.sev === s).length]);
+  const label = scanning ? `1 · cartographie (${step + 1}/${SCAN.length})` : done ? "rapport prêt" : `2 · constat ${step - SCAN.length + 1}/${FINDINGS.length}`;
+
+  return html`
+    <div class="controls">
+      <button onClick=${() => { if (done) setStep(0); setPlaying(p => done ? true : !p); }}>${done ? "↻ Rejouer" : playing ? "❚❚ Pause" : "▶ Lecture"}</button>
+      <button onClick=${() => setStep(s => Math.max(0, s - 1))} aria-label="Étape précédente">←</button>
+      <button onClick=${() => setStep(s => Math.min(LAST, s + 1))} aria-label="Étape suivante">→</button>
+      <span class="step-label">${label}</span>
+    </div>
+    <div class="bar"><${motion.div} animate=${{ width: `${(step / LAST) * 100}%` }} transition=${{ duration: .5 }} /></div>
+
+    <${AnimatePresence} mode="wait">
+    ${done ? html`
+      <${motion.div} key="sum" initial=${{ opacity: 0, y: 20 }} animate=${{ opacity: 1, y: 0 }} exit=${{ opacity: 0 }}>
+        <div class="stats">${counts.map(([s, n], i) => html`
+          <${motion.div} class="stat" key=${s} style=${{ "--sev": SEV[s] }}
+            initial=${{ opacity: 0, scale: .8 }} animate=${{ opacity: 1, scale: 1 }} transition=${{ delay: i * .12, type: "spring", stiffness: 260, damping: 18 }}>
+            <div class="v"><${Counter} to=${n} /></div><div class="k">${s.toLowerCase()}</div>
+          <//>`)}</div>
+        <div class="side panel" style=${{ marginTop: 16, minHeight: 0 }}>
+          <h2>Rapport — 8 constats, 0 faux positif, safe.py ignoré</h2>
+          ${FINDINGS.map((f, i) => html`
+            <${motion.div} class="card" key=${i} style=${{ "--sev": SEV[f.sev] }}
+              initial=${{ opacity: 0, x: -12 }} animate=${{ opacity: 1, x: 0 }} transition=${{ delay: .3 + i * .06 }}>
+              <div class="t"><span class="sev">${f.sev}</span>${f.t}</div>
+              <div class="w">${f.file}:${f.lines.join(",")}</div>
+              <div class="f">→ ${f.f}</div>
+            <//>`)}
+        </div>
+      <//>` : html`
+      <${motion.div} key="live" class="grid" initial=${{ opacity: 0 }} animate=${{ opacity: 1 }} exit=${{ opacity: 0, y: -10 }}>
+        <div class="panel">
+          <div class="tabs">${Object.keys(FILES).map(f => html`
+            <div class=${"tab" + (f === file ? " on" : "")} key=${f}>${f}
+              ${f === file && html`<${motion.div} layoutId="tabline" style=${{ position: "absolute", left: 0, right: 0, bottom: 0, height: 2, background: scanning ? "var(--accent)" : "var(--crit)" }} />`}
+              ${f === "src/safe.py" && step >= 2 && html`<span class="ok">✓</span>`}
+            </div>`)}</div>
+          <${AnimatePresence} mode="wait">
+            <${motion.div} key=${file} initial=${{ opacity: 0, x: 16 }} animate=${{ opacity: 1, x: 0 }} exit=${{ opacity: 0, x: -16 }} transition=${{ duration: .25 }}>
+              <${Code} file=${file} lines=${cur ? cur.lines : []} scan=${scanning} />
+            <//>
+          <//>
+        </div>
+        <div class="panel side">
+          <h2>${scanning ? "Points de contact IA" : "Constats"}</h2>
+          ${scanning ? SCAN.slice(0, step + 1).map((s, i) => html`
+            <${motion.div} class="scanline" key=${"s" + i} initial=${{ opacity: 0, y: 8 }} animate=${{ opacity: 1, y: 0 }}>${s.msg}<//>`)
+          : html`<${AnimatePresence} initial=${false}>${shown.slice().reverse().map((f, i) => html`
+            <${motion.div} layout class="card" key=${f.t} style=${{ "--sev": SEV[f.sev] }}
+              initial=${{ opacity: 0, y: -24, scale: .96 }} animate=${{ opacity: i === 0 ? 1 : .55, y: 0, scale: 1 }}
+              transition=${{ type: "spring", stiffness: 300, damping: 26 }}>
+              <div class="t"><span class="sev">${f.sev}</span>${f.t}</div>
+              <div class="w">${f.file}:${f.lines.join(",")}</div>
+              ${i === 0 && html`<${motion.div} initial=${{ opacity: 0 }} animate=${{ opacity: 1 }} transition=${{ delay: .25 }}>
+                <div class="d">${f.d}</div><div class="f">→ ${f.f}</div><//>`}
+            <//>`)}<//>`}
+        </div>
+      <//>`}
+    <//>`;
+}
+
+createRoot(document.getElementById("root")).render(html`<${App} />`);
+</script>
+</body>
+</html>

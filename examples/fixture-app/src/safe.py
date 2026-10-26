@@ -1,0 +1,1 @@
+def summarize(): return 'static'
