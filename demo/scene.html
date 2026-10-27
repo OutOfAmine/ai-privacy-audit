@@ -1,0 +1,291 @@
+<!doctype html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<title>ai-privacy-audit — demo scene</title>
+<!-- Video scene. Rendered frame by frame by render.py; replays a real `claude -p` run (trace in trace.json). -->
+<style>
+  :root {
+    --bg: #07080c; --panel: #0f121a; --panel2: #151926; --line: #222839;
+    --text: #e8eaf2; --muted: #7d859b; --accent: #8aa4ff; --claude: #d97757;
+    --crit: #ff4d63; --high: #ff9f43; --med: #f5cf4a; --ok: #4fd69c;
+    --mono: "Cascadia Code", "JetBrains Mono", Consolas, monospace;
+  }
+  * { box-sizing: border-box; margin: 0; }
+  html, body { width: 1280px; height: 720px; overflow: hidden; background: var(--bg); color: var(--text); font: 16px/1.5 "Segoe UI", system-ui, sans-serif; }
+  #root { position: absolute; inset: 0; }
+  .glow { position: absolute; border-radius: 50%; filter: blur(90px); opacity: .35; pointer-events: none; }
+  .scene { position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; }
+  .title { font-size: 64px; font-weight: 800; letter-spacing: -.03em; line-height: 1.05; text-align: center; max-width: 1000px; }
+  .title span { display: inline-block; white-space: pre; }
+  .sub { font: 18px var(--mono); color: var(--muted); margin-top: 24px; text-align: center; }
+  .chip { display: inline-block; padding: 4px 12px; border: 1px solid var(--line); border-radius: 999px; color: var(--accent); }
+  .term { width: 1040px; background: var(--panel); border: 1px solid var(--line); border-radius: 14px; overflow: hidden; box-shadow: 0 40px 120px rgba(0,0,0,.6); }
+  .term-bar { display: flex; align-items: center; gap: 8px; padding: 12px 16px; border-bottom: 1px solid var(--line); background: var(--panel2); font: 13px var(--mono); color: var(--muted); }
+  .dot { width: 12px; height: 12px; border-radius: 50%; }
+  .term-body { padding: 22px 26px; font: 17px/1.75 var(--mono); min-height: 380px; }
+  .prompt { color: var(--text); }
+  .prompt b { color: var(--claude); }
+  .caret { display: inline-block; width: 9px; height: 19px; background: var(--text); vertical-align: -3px; margin-left: 2px; }
+  .tool { display: flex; gap: 12px; align-items: baseline; }
+  .tool .bullet { color: var(--ok); }
+  .tool .name { color: var(--text); font-weight: 700; }
+  .tool .arg { color: var(--accent); }
+  .tool .t { margin-left: auto; color: var(--muted); font-size: 14px; }
+  .tool .res { color: var(--muted); }
+  .split { position: absolute; inset: 56px 32px 32px; display: grid; grid-template-columns: 1.4fr 1fr; gap: 22px; }
+  .code { background: var(--panel); border: 1px solid var(--line); border-radius: 14px; overflow: hidden; position: relative; }
+  .code-tabs { display: flex; font: 14px var(--mono); border-bottom: 1px solid var(--line); background: var(--panel2); }
+  .code-tabs > div { padding: 10px 16px; color: var(--muted); position: relative; }
+  .code-tabs > .on { color: var(--text); }
+  .code-lines { padding: 10px 0; font: 13px/1.62 var(--mono); }
+  .ln { display: flex; position: relative; white-space: pre; }
+  .ln .n { width: 48px; text-align: right; padding-right: 16px; color: #434a5e; flex: none; }
+  .ln .hl { position: absolute; inset: 0; }
+  .ln span { position: relative; }
+  .cards { display: flex; flex-direction: column; gap: 10px; }
+  .card { background: var(--panel); border: 1px solid var(--line); border-left: 4px solid var(--sev); border-radius: 10px; padding: 12px 16px; }
+  .card .h { font-weight: 700; font-size: 16px; display: flex; gap: 10px; align-items: baseline; }
+  .sev { font: 800 12px var(--mono); color: var(--sev); letter-spacing: .08em; }
+  .card .w { font: 13px var(--mono); color: var(--muted); margin-top: 2px; }
+  .card .d { font-size: 14.5px; color: #c4c9d6; margin-top: 6px; line-height: 1.45; }
+  .card .f { font-size: 14px; color: var(--ok); margin-top: 6px; }
+  .report { width: 1040px; height: 600px; overflow: hidden; background: var(--panel); border: 1px solid var(--line); border-radius: 14px; position: relative; }
+  .report pre { font: 15px/1.7 var(--mono); padding: 24px 30px; white-space: pre-wrap; color: #cfd4e2; }
+  .report .fade { position: absolute; left: 0; right: 0; height: 120px; pointer-events: none; }
+  .stats { display: flex; gap: 22px; }
+  .stat { width: 210px; padding: 24px; background: var(--panel); border: 1px solid var(--line); border-radius: 16px; text-align: center; }
+  .stat .v { font: 800 72px var(--mono); color: var(--sev); line-height: 1; }
+  .stat .k { margin-top: 10px; font: 14px var(--mono); color: var(--muted); text-transform: uppercase; letter-spacing: .1em; }
+  .meta { display: flex; gap: 34px; justify-content: center; margin-top: 34px; font: 17px var(--mono); color: var(--muted); }
+  .meta b { color: var(--text); }
+  .install { margin-top: 30px; font: 18px var(--mono); padding: 16px 24px; background: var(--panel); border: 1px solid var(--line); border-radius: 12px; }
+  .badge { position: absolute; top: 22px; right: 28px; font: 13px var(--mono); color: var(--muted); display: flex; gap: 8px; align-items: center; }
+  .rec { width: 9px; height: 9px; border-radius: 50%; background: var(--crit); }
+</style>
+</head>
+<body>
+<div id="root"></div>
+<!-- Render mode: framer-motion must animate on rAF (faked by the clock), not WAAPI (real compositor time). -->
+<script>if (location.search.includes("render")) delete Element.prototype.animate;</script>
+<script type="module">
+import React, { useState, useEffect } from "https://esm.sh/react@18.3.1";
+import { createRoot } from "https://esm.sh/react-dom@18.3.1/client";
+import { motion, AnimatePresence, useMotionValue, animate } from "https://esm.sh/framer-motion@11.11.17?deps=react@18.3.1,react-dom@18.3.1";
+import htm from "https://esm.sh/htm@3.1.1";
+const html = htm.bind(React.createElement);
+
+const REPORT = await (await fetch("report.md")).text();
+
+// Real files read by the run.
+const FILES = {
+  "src/support.py": `import logging
+from anthropic import Anthropic
+from db import get_customer, run_sql
+import pinecone
+
+client = Anthropic(api_key="sk-ant-EXAMPLE-NOT-A-REAL-KEY")
+log = logging.getLogger(__name__)
+index = pinecone.Index("tickets")
+
+def answer_ticket(customer_id, message):
+    customer = get_customer(customer_id)  # name, email, iban, medical_notes
+    prompt = f"You are support. Customer data: {customer}. Question: {message}"
+    log.info("prompt=%s", prompt)
+    resp = client.messages.create(model="claude-sonnet-5-5", max_tokens=500,
+        messages=[{"role": "user", "content": prompt}],
+        tools=[{"name": "run_sql", "description": "run any SQL", ...}])
+    for block in resp.content:
+        if block.type == "tool_use":
+            run_sql(block.input["query"])
+    return resp
+
+def search_docs(query_embedding, tenant_id):
+    # tenant_id ignored
+    return index.query(vector=query_embedding, top_k=5)`,
+  "web/chat.js": `const KEY = import.meta.env.VITE_OPENAI_KEY;
+export async function ask(q) {
+  const r = await fetch("https://api.openai.com/v1/chat/completions", {
+    method: "POST", headers: { Authorization: \`Bearer \${KEY}\` },
+    body: JSON.stringify({ model: "gpt-4o", messages: [{ role: "user", content: q }] })
+  });
+  const j = await r.json();
+  document.getElementById("out").innerHTML = j.choices[0].message.content;
+}`,
+};
+
+// Tool calls with their real timestamps from trace.json.
+const TOOLS = [
+  { t: "6.9s", name: "Skill", arg: "ai-privacy-audit", res: "skill chargé" },
+  { t: "8.5s", name: "Glob", arg: "**/*", res: "3 fichiers" },
+  { t: "10.9s", name: "Read", arg: "src/support.py", res: "24 lignes" },
+  { t: "11.9s", name: "Read", arg: "src/safe.py", res: "aucun appel IA" },
+  { t: "13.0s", name: "Read", arg: "web/chat.js", res: "9 lignes" },
+  { t: "42.6s", name: "Réponse", arg: "rapport", res: "7 constats" },
+];
+
+const SEV = { CRITIQUE: "var(--crit)", HAUTE: "var(--high)", MOYENNE: "var(--med)" };
+// Findings exactly as the real report lists them.
+const FINDINGS = [
+  { sev: "CRITIQUE", file: "src/support.py", lines: [12, 16, 19], where: "support.py:16, 19",
+    t: "Agent avec SQL arbitraire piloté par le client", d: "Le message libre pilote un outil run_sql « run any SQL » exécuté tel quel.", f: "Outils étroits et paramétrés, rôle DB lecture seule." },
+  { sev: "CRITIQUE", file: "src/support.py", lines: [22, 23, 24], where: "support.py:22-24",
+    t: "RAG multi-tenant sans filtre", d: "tenant_id reçu puis ignoré : le client A lit les tickets du client B.", f: "filter={\"tenant_id\": {\"$eq\": tenant_id}}" },
+  { sev: "CRITIQUE", file: "web/chat.js", lines: [1, 4], where: "chat.js:1, 4",
+    t: "Clé OpenAI exposée dans le bundle", d: "VITE_* est livré au navigateur : n'importe quel visiteur extrait la clé.", f: "Endpoint backend authentifié, révoquer la clé." },
+  { sev: "CRITIQUE", file: "web/chat.js", lines: [8], where: "chat.js:8",
+    t: "Sortie LLM rendue via innerHTML (XSS)", d: "Un prompt injecté produit <img onerror=…> exécuté dans la page.", f: "textContent, ou markdown + DOMPurify." },
+  { sev: "HAUTE", file: "src/support.py", lines: [11, 12], where: "support.py:11-12",
+    t: "Santé + IBAN envoyés sans minimisation", d: "L'objet client entier (art. 9 RGPD, bancaire) part dans le prompt.", f: "Champs utiles uniquement, pseudonymisation." },
+  { sev: "HAUTE", file: "src/support.py", lines: [13], where: "support.py:13",
+    t: "Prompt avec PII écrit dans les logs", d: "IBAN, notes médicales et email loggés en clair.", f: "Logger des métadonnées seulement." },
+  { sev: "MOYENNE", file: "src/support.py", lines: [6], where: "support.py:6",
+    t: "Clé Anthropic en dur", d: "Littéral sk-ant-… dans le code source.", f: "Anthropic() lit ANTHROPIC_API_KEY." },
+];
+
+const PROMPT = "Est-ce que mon app envoie des données clients à l'IA ?";
+const FIND_MS = 2900;
+// Scene start times (ms).
+const T = { title: 0, term: 4200, findings: 15000, report: 15000 + FINDINGS.length * FIND_MS, stats: 15000 + FINDINGS.length * FIND_MS + 6500 };
+const END = T.stats + 7500;
+
+function useClock() {
+  const [ms, setMs] = useState(0);
+  useEffect(() => { const t0 = performance.now(); let id; const tick = () => { window.__ms = performance.now() - t0; setMs(window.__ms); id = requestAnimationFrame(tick); }; id = requestAnimationFrame(tick); return () => cancelAnimationFrame(id); }, []);
+  return ms;
+}
+
+const spring = { type: "spring", stiffness: 220, damping: 24 };
+
+function Title() {
+  const words = "Vos données clients partent-elles vers une IA ?".split(" ");
+  return html`<${motion.div} class="scene" exit=${{ opacity: 0, scale: 1.08, filter: "blur(12px)" }} transition=${{ duration: .6 }}>
+    <div>
+      <div class="title">${words.map((w, i) => html`<${motion.span} key=${i}
+        initial=${{ opacity: 0, y: 60, rotateX: -80, filter: "blur(8px)" }} animate=${{ opacity: 1, y: 0, rotateX: 0, filter: "blur(0px)" }}
+        transition=${{ ...spring, delay: .15 + i * .09, filter: { duration: .5, delay: .15 + i * .09 } }}>${w + " "}<//>`)}</div>
+      <${motion.div} class="sub" initial=${{ opacity: 0, y: 16 }} animate=${{ opacity: 1, y: 0 }} transition=${{ delay: 1.4 }}>
+        <span class="chip">ai-privacy-audit</span>  skill Claude Code · exécution réelle, non retouchée
+      <//>
+    </div>
+  <//>`;
+}
+
+function Terminal({ ms }) {
+  const local = ms - T.term;
+  const typed = PROMPT.slice(0, Math.max(0, Math.floor((local - 600) / 38)));
+  const toolsShown = TOOLS.filter((_, i) => local > 3200 + i * 1050);
+  return html`<${motion.div} class="scene" initial=${{ opacity: 0 }} animate=${{ opacity: 1 }} exit=${{ opacity: 0, y: -40, scale: .94 }} transition=${{ duration: .5 }}>
+    <${motion.div} class="term" initial=${{ y: 80, rotateX: 18, opacity: 0 }} animate=${{ y: 0, rotateX: 0, opacity: 1 }} transition=${spring} style=${{ transformPerspective: 1200 }}>
+      <div class="term-bar"><span class="dot" style=${{ background: "#ff5f57" }}></span><span class="dot" style=${{ background: "#febc2e" }}></span><span class="dot" style=${{ background: "#28c840" }}></span><span style=${{ marginLeft: 12 }}>claude — ~/fixture-app</span></div>
+      <div class="term-body">
+        <div class="prompt"><b>›</b> ${typed}${typed.length < PROMPT.length && html`<${motion.span} class="caret" animate=${{ opacity: [1, 0, 1] }} transition=${{ repeat: Infinity, duration: .8 }} />`}</div>
+        <div style=${{ height: 18 }}></div>
+        ${toolsShown.map((tl, i) => html`<${motion.div} class="tool" key=${i} initial=${{ opacity: 0, x: -30 }} animate=${{ opacity: 1, x: 0 }} transition=${spring}>
+          <${motion.span} class="bullet" animate=${{ scale: [1.8, 1] }}>⏺<//>
+          <span><span class="name">${tl.name}</span>(<span class="arg">${tl.arg}</span>)</span>
+          <span class="res">⎿ ${tl.res}</span>
+          <span class="t">${tl.t}</span>
+        <//>`)}
+      </div>
+    <//>
+  <//>`;
+}
+
+function Findings({ ms }) {
+  const idx = Math.min(FINDINGS.length - 1, Math.floor((ms - T.findings) / FIND_MS));
+  const cur = FINDINGS[idx];
+  const shown = FINDINGS.slice(0, idx + 1).reverse().slice(0, 4);
+  return html`<${motion.div} class="split" initial=${{ opacity: 0, scale: .96 }} animate=${{ opacity: 1, scale: 1 }} exit=${{ opacity: 0, x: -60 }} transition=${{ duration: .5 }}>
+    <div class="code">
+      <div class="code-tabs">${Object.keys(FILES).map(f => html`<div key=${f} class=${f === cur.file ? "on" : ""}>${f}
+        ${f === cur.file && html`<div style=${{ position: "absolute", left: 0, right: 0, bottom: 0, height: 2, background: SEV[cur.sev] }} />`}</div>`)}</div>
+      <${AnimatePresence} mode="wait">
+        <${motion.div} class="code-lines" key=${cur.file} initial=${{ opacity: 0, y: 20 }} animate=${{ opacity: 1, y: 0 }} exit=${{ opacity: 0, y: -20 }} transition=${{ duration: .18 }}>
+          ${FILES[cur.file].split("\n").map((l, i) => {
+            const on = cur.lines.includes(i + 1);
+            return html`<div class="ln" key=${i}>
+              ${on && html`<${motion.div} class="hl" key=${idx + "-" + i}
+                initial=${{ scaleX: 0, opacity: 0 }} animate=${{ scaleX: 1, opacity: 1 }} transition=${{ duration: .5, delay: cur.lines.indexOf(i + 1) * .18, ease: [.2, .8, .2, 1] }}
+                style=${{ originX: 0, background: `color-mix(in srgb, ${SEV[cur.sev]} 18%, transparent)`, boxShadow: `inset 4px 0 0 ${SEV[cur.sev]}` }} />`}
+              <span class="n">${i + 1}</span><span>${l || " "}</span>
+            </div>`;
+          })}
+        <//>
+      <//>
+    </div>
+    <div class="cards">
+      <div style=${{ font: "14px var(--mono)", color: "var(--muted)", marginBottom: 4 }}>CONSTAT ${idx + 1} / ${FINDINGS.length}</div>
+      <${AnimatePresence} initial=${false}>
+        ${shown.map((f, i) => html`<${motion.div} layout key=${f.t} class="card" style=${{ "--sev": SEV[f.sev] }}
+          initial=${{ opacity: 0, x: 120, scale: .9 }} animate=${{ opacity: i === 0 ? 1 : .45 - i * .08, x: 0, scale: i === 0 ? 1 : .97 }}
+          exit=${{ opacity: 0, y: 30 }} transition=${spring}>
+          <div class="h"><span class="sev">${f.sev}</span>${f.t}</div>
+          <div class="w">${f.where}</div>
+          ${i === 0 && html`<${motion.div} initial=${{ opacity: 0, height: 0 }} animate=${{ opacity: 1, height: "auto" }} transition=${{ delay: .35 }}>
+            <div class="d">${f.d}</div><div class="f">→ ${f.f}</div><//>`}
+        <//>`)}
+      <//>
+    </div>
+  <//>`;
+}
+
+function Report() {
+  const y = useMotionValue(0);
+  useEffect(() => { const c = animate(y, -2350, { duration: 5.6, ease: [.45, 0, .2, 1], delay: .5 }); return () => c.stop(); }, []);
+  return html`<${motion.div} class="scene" initial=${{ opacity: 0, rotateY: -25 }} animate=${{ opacity: 1, rotateY: 0 }} exit=${{ opacity: 0, scale: .85, filter: "blur(10px)" }} transition=${{ duration: .6 }} style=${{ transformPerspective: 1400 }}>
+    <div class="report">
+      <${motion.pre} style=${{ y }}>${REPORT}<//>
+      <div class="fade" style=${{ top: 0, background: "linear-gradient(var(--panel), transparent)" }}></div>
+      <div class="fade" style=${{ bottom: 0, background: "linear-gradient(transparent, var(--panel))" }}></div>
+    </div>
+  <//>`;
+}
+
+function Count({ to, delay }) {
+  const [v, setV] = useState(0);
+  useEffect(() => { const c = animate(0, to, { duration: .9, delay, onUpdate: x => setV(Math.round(x)) }); return () => c.stop(); }, []);
+  return html`${v}`;
+}
+
+function Stats() {
+  const s = [["CRITIQUE", 4], ["HAUTE", 2], ["MOYENNE", 1]];
+  return html`<${motion.div} class="scene" initial=${{ opacity: 0 }} animate=${{ opacity: 1 }}>
+    <div style=${{ textAlign: "center" }}>
+      <div class="stats" style=${{ justifyContent: "center" }}>${s.map(([k, n], i) => html`
+        <${motion.div} class="stat" key=${k} style=${{ "--sev": SEV[k] }} initial=${{ opacity: 0, y: 70, rotate: -6 }} animate=${{ opacity: 1, y: 0, rotate: 0 }} transition=${{ ...spring, delay: i * .15 }}>
+          <div class="v"><${Count} to=${n} delay=${.2 + i * .15} /></div><div class="k">${k.toLowerCase()}</div>
+        <//>`)}</div>
+      <${motion.div} class="meta" initial=${{ opacity: 0 }} animate=${{ opacity: 1 }} transition=${{ delay: 1 }}>
+        <span><b>45 s</b> de bout en bout</span><span><b>5</b> outils lecture seule</span><span><b>0</b> fichier modifié</span><span><b>0</b> secret recopié</span>
+      <//>
+      <${motion.div} class="install" initial=${{ opacity: 0, y: 20 }} animate=${{ opacity: 1, y: 0 }} transition=${{ delay: 1.8 }}>
+        github.com/<b style=${{ color: "var(--claude)" }}>OutOfAmine/ai-privacy-audit</b>
+      <//>
+    </div>
+  <//>`;
+}
+
+function App() {
+  const ms = useClock();
+  useEffect(() => { window.__duration = END; }, []);
+  const scene = ms < T.term ? "title" : ms < T.findings ? "term" : ms < T.report ? "find" : ms < T.stats ? "report" : "stats";
+  return html`
+    <${motion.div} class="glow" style=${{ width: 700, height: 700, background: "var(--claude)" }} animate=${{ x: [-300, 700, -300], y: [-200, 200, -200] }} transition=${{ duration: 30, repeat: Infinity, ease: "easeInOut" }} />
+    <${motion.div} class="glow" style=${{ width: 600, height: 600, background: "var(--accent)", right: -200, bottom: -200 }} animate=${{ x: [0, -500, 0], y: [0, -250, 0] }} transition=${{ duration: 26, repeat: Infinity, ease: "easeInOut" }} />
+    <div class="badge"><${motion.span} class="rec" animate=${{ opacity: [1, .2, 1] }} transition=${{ repeat: Infinity, duration: 1.2 }} />replay · claude -p · Opus 5.5</div>
+    <${AnimatePresence} mode="wait">
+      ${scene === "title" && html`<${Title} key="title" />`}
+      ${scene === "term" && html`<${Terminal} key="term" ms=${ms} />`}
+      ${scene === "find" && html`<${Findings} key="find" ms=${ms} />`}
+      ${scene === "report" && html`<${Report} key="report" />`}
+      ${scene === "stats" && html`<${Stats} key="stats" />`}
+    <//>`;
+}
+
+// render.py pauses the fake clock first, then calls __start so frame 0 is t=0.
+window.__start = () => createRoot(document.getElementById("root")).render(html`<${App} />`);
+if (!location.search.includes("render")) window.__start();
+</script>
+</body>
+</html>
