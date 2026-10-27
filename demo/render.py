@@ -37,7 +37,10 @@ server.shutdown()
 src = ["-framerate", str(FPS), "-i", str(frames / "%05d.png")]
 subprocess.run([FFMPEG, "-y", *src, "-c:v", "libx264", "-pix_fmt", "yuv420p", "-crf", "20", "-preset", "slow",
                 "-movflags", "+faststart", str(HERE / "demo.mp4")], check=True)
-subprocess.run([FFMPEG, "-y", *src, "-vf",
-                "fps=8,scale=640:-1:flags=lanczos,split[a][b];[a]palettegen=max_colors=64:stats_mode=diff[p];[b][p]paletteuse=dither=none:diff_mode=rectangle",
+# GIF: GitHub shows frame 0 before playback, so open on the fully visible title (t=2.5s), then play from the start.
+subprocess.run([FFMPEG, "-y", "-i", str(HERE / "demo.mp4"), "-filter_complex",
+                "[0]split[x][y];[x]trim=start=2.5:duration=0.125,setpts=PTS-STARTPTS[poster];[y]setpts=PTS-STARTPTS[all];"
+                "[poster][all]concat=n=2:v=1,fps=8,scale=640:-1:flags=lanczos,split[a][b];"
+                "[a]palettegen=max_colors=64:stats_mode=diff[p];[b][p]paletteuse=dither=none:diff_mode=rectangle",
                 str(HERE / "demo.gif")], check=True)
 shutil.rmtree(frames)
